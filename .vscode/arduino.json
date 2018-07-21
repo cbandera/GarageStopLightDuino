@@ -1,0 +1,5 @@
+{
+    "board": "Seeeduino:Seeeduino_AVR:atmega328",
+    "sketch": "GarageStopLight.ino",
+    "port": "COM3"
+}

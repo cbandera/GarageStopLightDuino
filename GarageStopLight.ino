@@ -23,39 +23,30 @@ bool g_ledStates[LED_COUNT];
 volatile int g_invalidCount = 0;
 
 /// Watchdog timer Interrupt Service Routine
-ISR(WDT_vect)
-{
-  if (g_invalidCount == INVALID_SLEEP_LIMIT)
-  {
+ISR(WDT_vect) {
+  if (g_invalidCount == INVALID_SLEEP_LIMIT) {
     g_invalidCount = 0;
-  }
-  else
-  {
+  } else {
     // Serial.println("WDT Overrun Error!");
   }
 }
 
 int indexToPin(int index) { return LED_PIN_MIN + index; }
 
-void setLedStates(bool state, int upto = LED_COUNT)
-{
+void setLedStates(bool state, int upto = LED_COUNT) {
   upto = min(upto, LED_COUNT);
-  for (int i = 0; i < upto; ++i)
-  {
+  for (int i = 0; i < upto; ++i) {
     g_ledStates[i] = state;
   }
 }
 
-void writeLedPins()
-{
-  for (int i = 0; i < LED_COUNT; ++i)
-  {
+void writeLedPins() {
+  for (int i = 0; i < LED_COUNT; ++i) {
     digitalWrite(indexToPin(i), g_ledStates[i]);
   }
 }
 
-void blink(int frequency = 10)
-{
+void blink(int frequency = 10) {
   setLedStates(LOW);
   writeLedPins();
   delay(1000 / frequency);
@@ -64,77 +55,85 @@ void blink(int frequency = 10)
   delay(1000 / frequency);
 }
 
-void roll(int frequency = 15)
-{
-  for (int i = LED_COUNT - 1; i >= 0; --i)
-  {
+void roll(int frequency = 15) {
+  for (int i = LED_COUNT - 1; i >= 0; --i) {
     setLedStates(LOW);
     g_ledStates[i] = HIGH;
     writeLedPins();
     delay(1000 / frequency);
   }
-  for (int i = 0; i < LED_COUNT; ++i)
-  {
+  for (int i = 0; i < LED_COUNT; ++i) {
     setLedStates(LOW);
     g_ledStates[i] = HIGH;
     writeLedPins();
     delay(1000 / frequency);
   }
 }
+void setupLedPins() {
+  for (int i = 0; i < LED_COUNT; ++i) {
+    pinMode(indexToPin(i), OUTPUT);
+  }
+}
 
-int getDistanceInCm()
-{
+void setupWatchdogTimer() {
+  MCUSR &= ~(1 << WDRF); /* WDT reset flag loeschen */
+  WDTCSR |=
+      (1 << WDCE) | (1 << WDE);   /* WDCE setzen, Zugriff auf Prescaler etc. */
+  WDTCSR = 1 << WDP0 | 1 << WDP3; /* Prescaler auf 8.0 s */
+  WDTCSR |= 1 << WDIE;            /* WDT Interrupt freigeben */
+}
+
+void setup() {
+  setupLedPins();
+  setupWatchdogTimer();
+
+  setLedStates(LOW);
+  writeLedPins();
+
+  Serial.begin(9600);
+
+  roll();
+}
+
+int getDistanceInCm() {
   auto uS = g_sonarSensor.ping_median();
   auto cm = g_sonarSensor.convert_cm(uS);
   return cm;
 }
 
-void catchInvalidMeasurement(int &cm)
-{
-  if (cm == INVALID_DISTANCE || cm > MAX_DISTANCE)
-  {
+void catchInvalidMeasurement(int &cm) {
+  if (cm == INVALID_DISTANCE || cm > MAX_DISTANCE) {
     ++g_invalidCount;
     cm = MAX_DISTANCE; // Make it more robust and improve visualisation in plot
-  }
-  else
-  {
+  } else {
     g_invalidCount = 0; // One sane measurement heales
   }
 }
 
-void visualizeAsLightbar(const int cm)
-{
+void visualizeAsLightbar(const int cm) {
   setLedStates(HIGH);
-  if (cm > MIN_DISTANCE)
-  {
+  if (cm > MIN_DISTANCE) {
     int numLedsOff = (cm - MIN_DISTANCE) / DS;
     setLedStates(LOW, numLedsOff);
     writeLedPins();
-  }
-  else
-  {
+  } else {
     blink(20);
   }
 }
 
-void visualizeAsStrobe(const int cm)
-{
+void visualizeAsStrobe(const int cm) {
 
-  if (cm > MIN_DISTANCE)
-  {
-    auto factor = (cm - MIN_DISTANCE) / (MAX_DISTANCE-MIN_DISTANCE);
-    int frequency = MAX_FREQUENCY - (MAX_FREQUENCY-MIN_FREQUENCY)*factor;
+  if (cm > MIN_DISTANCE) {
+    auto factor = (cm - MIN_DISTANCE) / (MAX_DISTANCE - MIN_DISTANCE);
+    int frequency = MAX_FREQUENCY - (MAX_FREQUENCY - MIN_FREQUENCY) * factor;
     blink(frequency);
-  }
-  else
-  {
+  } else {
     setLedStates(HIGH);
     writeLedPins();
   }
 }
 
-void goToSleep()
-{
+void goToSleep() {
   digitalWrite(LED_PIN_MIN, HIGH);
 
   // Taken from
@@ -151,51 +150,17 @@ void goToSleep()
   power_all_enable(); /* Komponenten wieder aktivieren */
 }
 
-void setupWatchdogTimer()
-{
-  MCUSR &= ~(1 << WDRF); /* WDT reset flag loeschen */
-  WDTCSR |=
-      (1 << WDCE) | (1 << WDE);   /* WDCE setzen, Zugriff auf Prescaler etc. */
-  WDTCSR = 1 << WDP0 | 1 << WDP3; /* Prescaler auf 8.0 s */
-  WDTCSR |= 1 << WDIE;            /* WDT Interrupt freigeben */
-}
-
-void setupLedPins()
-{
-  for (int i = 0; i < LED_COUNT; ++i)
-  {
-    pinMode(indexToPin(i), OUTPUT);
-  }
-}
-
-void setup()
-{
-  setupLedPins();
-  setupWatchdogTimer();
-
-  setLedStates(LOW);
-  writeLedPins();
-
-  Serial.begin(9600);
-
-  roll();
-}
-
-void loop()
-{
+void loop() {
   int distance = getDistanceInCm();
   catchInvalidMeasurement(distance);
 
-  if (g_invalidCount == INVALID_SLEEP_LIMIT)
-  {
+  if (g_invalidCount == INVALID_SLEEP_LIMIT) {
     Serial.println("Going to sleep.");
     Serial.flush();
     goToSleep();
-  }
-  else
-  {
+  } else {
     Serial.println(distance);
     visualizeAsLightbar(distance);
-    //visualizeAsStrobe(distance);
+    // visualizeAsStrobe(distance);
   }
 }

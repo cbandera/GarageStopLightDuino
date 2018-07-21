@@ -7,6 +7,8 @@
 #define ECHO_PIN 12
 #define MIN_DISTANCE 50
 #define MAX_DISTANCE 200
+#define MIN_FREQUENCY 1
+#define MAX_FREQUENCY 20
 #define LED_PIN_MIN 2 // RED (PS: Don't use Serial ports)
 #define LED_PIN_MAX 9 // GREEN
 #define INVALID_SLEEP_LIMIT 10
@@ -62,7 +64,7 @@ void blink(int frequency = 10)
   delay(1000 / frequency);
 }
 
-void roll(int frequency = 10)
+void roll(int frequency = 15)
 {
   for (int i = LED_COUNT - 1; i >= 0; --i)
   {
@@ -100,7 +102,7 @@ void catchInvalidMeasurement(int &cm)
   }
 }
 
-void visualizeDistance(const int cm)
+void visualizeAsLightbar(const int cm)
 {
   setLedStates(HIGH);
   if (cm > MIN_DISTANCE)
@@ -111,7 +113,23 @@ void visualizeDistance(const int cm)
   }
   else
   {
-    blink();
+    blink(20);
+  }
+}
+
+void visualizeAsStrobe(const int cm)
+{
+
+  if (cm > MIN_DISTANCE)
+  {
+    auto factor = (cm - MIN_DISTANCE) / (MAX_DISTANCE-MIN_DISTANCE);
+    int frequency = MAX_FREQUENCY - (MAX_FREQUENCY-MIN_FREQUENCY)*factor;
+    blink(frequency);
+  }
+  else
+  {
+    setLedStates(HIGH);
+    writeLedPins();
   }
 }
 
@@ -177,6 +195,7 @@ void loop()
   else
   {
     Serial.println(distance);
-    visualizeDistance(distance);
+    visualizeAsLightbar(distance);
+    //visualizeAsStrobe(distance);
   }
 }

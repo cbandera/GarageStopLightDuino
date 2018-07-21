@@ -52,14 +52,32 @@ void writeLedPins()
   }
 }
 
-void blink()
+void blink(int frequency = 10)
 {
   setLedStates(LOW);
   writeLedPins();
-  delay(100);
+  delay(1000 / frequency);
   setLedStates(HIGH);
   writeLedPins();
-  delay(100);
+  delay(1000 / frequency);
+}
+
+void roll(int frequency = 10)
+{
+  for (int i = LED_COUNT - 1; i >= 0; --i)
+  {
+    setLedStates(LOW);
+    g_ledStates[i] = HIGH;
+    writeLedPins();
+    delay(1000 / frequency);
+  }
+  for (int i = 0; i < LED_COUNT; ++i)
+  {
+    setLedStates(LOW);
+    g_ledStates[i] = HIGH;
+    writeLedPins();
+    delay(1000 / frequency);
+  }
 }
 
 int getDistanceInCm()
@@ -142,8 +160,7 @@ void setup()
 
   Serial.begin(9600);
 
-  for (int i = 0; i < 3; ++i)
-    blink();
+  roll();
 }
 
 void loop()

@@ -9,27 +9,34 @@
 #define LED_PIN_MAX 9 // GREEN
 
 #define LED_COUNT (LED_PIN_MAX - LED_PIN_MIN + 1) // Inclusive the LED_PIN_MAX
-#define DS ( (MAX_DISTANCE - MIN_DISTANCE) / LED_COUNT )
+#define DS ((MAX_DISTANCE - MIN_DISTANCE) / LED_COUNT)
 #define INVALID_DISTANCE 0
 
-NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE); // NewPing setup of pins and maximum distance.
+NewPing sonar(TRIGGER_PIN, ECHO_PIN,
+              MAX_DISTANCE); // NewPing setup of pins and maximum distance.
 bool led_states[LED_COUNT];
 
-int indexToPin(int index) {
-  return LED_PIN_MIN + index;
-}
+int indexToPin(int index) { return LED_PIN_MIN + index; }
 
-void resetLedStates() {
-  for (int i = 0; i < LED_COUNT; ++i)
-  {
-    led_states[i] = LOW;
+void setLedStates(bool state, int upto = LED_COUNT) {
+  for (int i = 0; i < upto; ++i) {
+    led_states[i] = state;
   }
 }
 
-void writeLedStates() {
+void writeLedPins() {
   for (int i = 0; i < LED_COUNT; ++i) {
     digitalWrite(indexToPin(i), led_states[i]);
   }
+}
+
+void blink() {
+  setLedStates(LOW);
+  writeLedPins();
+  delay(DELAY_IN_MS);
+  setLedStates(HIGH);
+  writeLedPins();
+  delay(DELAY_IN_MS);
 }
 
 unsigned int getDistanceInCm() {
@@ -39,17 +46,21 @@ unsigned int getDistanceInCm() {
   if (cm == INVALID_DISTANCE || cm > MAX_DISTANCE) {
     cm = MAX_DISTANCE; // Make it more robust and improve visualisation in plot
   }
-  
+
   return cm;
 }
 
-void setLedStatesBasedOnDistance(unsigned int cm)
-{
-  for (int i = 0; i < LED_COUNT; ++i)
-  {
-    if (cm < MIN_DISTANCE + DS * i )
-      led_states[i] = HIGH;
+void visualizeDistance(unsigned int cm) {
+  setLedStates(HIGH);
+
+  auto numLedsOff = (cm - MIN_DISTANCE) % DS;
+  if (numLedsOff >= 0) {
+    setLedStates(LOW, numLedsOff);
+  } else {
+    blink();
   }
+
+  writeLedPins();
 }
 
 void setup() {
@@ -57,20 +68,21 @@ void setup() {
     pinMode(indexToPin(i), OUTPUT);
   }
 
-  resetLedStates();
-  writeLedStates();
+  setLedStates(LOW);
+  writeLedPins();
 
   Serial.begin(9600);
+
+  blink();
+  blink();
+  blink();
 }
 
 void loop() {
-  resetLedStates();
-
   auto distance = getDistanceInCm();
   Serial.println(distance);
 
-  setLedStatesBasedOnDistance(distance);
-  writeLedStates();
+  visualizeDistance(distance);
 
   delay(DELAY_IN_MS);
 }

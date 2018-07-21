@@ -5,8 +5,8 @@
 #define ECHO_PIN 12
 #define MAX_DISTANCE 200
 #define MIN_DISTANCE 50
-#define LED_PIN_MIN 2 // RED
-#define LED_PIN_MAX 7 // GREEN
+#define LED_PIN_MIN 2 // RED (Don't use Serial ports)
+#define LED_PIN_MAX 9 // GREEN
 
 #define LED_COUNT (LED_PIN_MAX - LED_PIN_MIN + 1) // Inclusive the LED_PIN_MAX
 #define DS ( (MAX_DISTANCE - MIN_DISTANCE) / LED_COUNT )

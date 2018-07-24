@@ -1,7 +1,5 @@
+#include <LowPower.h>
 #include <NewPing.h>
-#include <avr/power.h>
-#include <avr/sleep.h>
-#include <avr/wdt.h>
 
 #define TRIGGER_PIN 11
 #define ECHO_PIN 12
@@ -11,7 +9,8 @@
 #define MAX_FREQUENCY 20
 #define LED_PIN_MIN 2 // RED (PS: Don't use Serial ports)
 #define LED_PIN_MAX 9 // GREEN
-#define INVALID_SLEEP_LIMIT 10
+#define INVALID_LIMIT 10
+
 #define LED_COUNT (LED_PIN_MAX - LED_PIN_MIN + 1) // Inclusive the LED_PIN_MAX
 #define DS ((MAX_DISTANCE - MIN_DISTANCE) / LED_COUNT)
 #define INVALID_DISTANCE 0
@@ -20,16 +19,7 @@ NewPing
     g_sonarSensor(TRIGGER_PIN, ECHO_PIN,
                   MAX_DISTANCE); // NewPing setup of pins and maximum distance.
 bool g_ledStates[LED_COUNT];
-volatile int g_invalidCount = 0;
-
-/// Watchdog timer Interrupt Service Routine
-ISR(WDT_vect) {
-  if (g_invalidCount == INVALID_SLEEP_LIMIT) {
-    g_invalidCount = 0;
-  } else {
-    // Serial.println("WDT Overrun Error!");
-  }
-}
+int g_invalidCount = 0;
 
 int indexToPin(int index) { return LED_PIN_MIN + index; }
 
@@ -75,23 +65,11 @@ void setupLedPins() {
   }
 }
 
-void setupWatchdogTimer() {
-  MCUSR &= ~(1 << WDRF); /* WDT reset flag loeschen */
-  WDTCSR |=
-      (1 << WDCE) | (1 << WDE);   /* WDCE setzen, Zugriff auf Prescaler etc. */
-  WDTCSR = 1 << WDP0 | 1 << WDP3; /* Prescaler auf 8.0 s */
-  WDTCSR |= 1 << WDIE;            /* WDT Interrupt freigeben */
-}
-
 void setup() {
   setupLedPins();
-  setupWatchdogTimer();
-
   setLedStates(LOW);
   writeLedPins();
-
   Serial.begin(9600);
-
   roll();
 }
 
@@ -134,27 +112,17 @@ void visualizeAsStrobe(const int cm) {
 }
 
 void goToSleep() {
+  g_invalidCount = 0;
   digitalWrite(LED_PIN_MIN, HIGH);
-
-  // Taken from
-  // http://www.netzmafia.de/skripten/hardware/Arduino/Sleep/index.html
-  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-  sleep_enable();
-  power_adc_disable();    /* Analog-Eingaenge abschalten */
-  power_spi_disable();    /* SPI abschalten */
-  power_timer0_disable(); /* Timer0 abschalten */
-  power_timer2_disable(); /* Timer0 abschalten */
-  power_twi_disable();    /* TWI abschalten */
-  sleep_mode();
-  sleep_disable();
-  power_all_enable(); /* Komponenten wieder aktivieren */
+  LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+  // LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_OFF, USART0_OFF, TWI_OFF);
 }
 
 void loop() {
   int distance = getDistanceInCm();
   catchInvalidMeasurement(distance);
 
-  if (g_invalidCount == INVALID_SLEEP_LIMIT) {
+  if (g_invalidCount == INVALID_LIMIT) {
     Serial.println("Going to sleep.");
     Serial.flush();
     goToSleep();

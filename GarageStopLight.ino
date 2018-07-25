@@ -3,13 +3,13 @@
 
 #define TRIGGER_PIN 11
 #define ECHO_PIN 12
-#define MIN_DISTANCE 50
-#define MAX_DISTANCE 200
+#define MIN_DISTANCE 10
+#define MAX_DISTANCE 100
 #define MIN_FREQUENCY 1
 #define MAX_FREQUENCY 20
 #define LED_PIN_MIN 2 // RED (PS: Don't use Serial ports)
 #define LED_PIN_MAX 9 // GREEN
-#define INVALID_LIMIT 10
+#define INACTIVITY_LIMIT 20
 
 #define LED_COUNT (LED_PIN_MAX - LED_PIN_MIN + 1) // Inclusive the LED_PIN_MAX
 #define DS ((MAX_DISTANCE - MIN_DISTANCE) / LED_COUNT)
@@ -19,7 +19,8 @@ NewPing
     g_sonarSensor(TRIGGER_PIN, ECHO_PIN,
                   MAX_DISTANCE); // NewPing setup of pins and maximum distance.
 bool g_ledStates[LED_COUNT];
-int g_invalidCount = 0;
+int g_inactivityCount = 0;
+int g_lastMeasurement = 0;
 
 int indexToPin(int index) { return LED_PIN_MIN + index; }
 
@@ -81,10 +82,7 @@ int getDistanceInCm() {
 
 void catchInvalidMeasurement(int &cm) {
   if (cm == INVALID_DISTANCE || cm > MAX_DISTANCE) {
-    ++g_invalidCount;
     cm = MAX_DISTANCE; // Make it more robust and improve visualisation in plot
-  } else {
-    g_invalidCount = 0; // One sane measurement heales
   }
 }
 
@@ -112,23 +110,36 @@ void visualizeAsStrobe(const int cm) {
 }
 
 void goToSleep() {
-  g_invalidCount = 0;
-  digitalWrite(LED_PIN_MIN, HIGH);
+  blink(15);
+  setLedStates(LOW);
+  writeLedPins();
   LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
-  // LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_OFF, USART0_OFF, TWI_OFF);
+  // LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF,
+  // SPI_OFF, USART0_OFF, TWI_OFF);
+}
+
+void checkForInactivity(int distance) {
+  if (distance == g_lastMeasurement) {
+    ++g_inactivityCount;
+  } else {
+    g_inactivityCount = 0;
+  }
+
+  g_lastMeasurement = distance;
+
+  if (g_inactivityCount == INACTIVITY_LIMIT) {
+    Serial.println("Going to sleep.");
+    Serial.flush();
+    g_inactivityCount = 0;
+    goToSleep();
+  }
 }
 
 void loop() {
   int distance = getDistanceInCm();
   catchInvalidMeasurement(distance);
-
-  if (g_invalidCount == INVALID_LIMIT) {
-    Serial.println("Going to sleep.");
-    Serial.flush();
-    goToSleep();
-  } else {
-    Serial.println(distance);
-    visualizeAsLightbar(distance);
-    // visualizeAsStrobe(distance);
-  }
+  checkForInactivity(distance);
+  Serial.println(distance);
+  visualizeAsLightbar(distance);
+  // visualizeAsStrobe(distance);
 }

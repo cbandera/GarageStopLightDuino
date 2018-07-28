@@ -123,30 +123,32 @@ void goToSleep() {
   blink(15);
   setLedStates(LOW);
   writeLedPins();
-  LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+  LowPower.powerDown(SLEEP_4S, ADC_OFF, BOD_OFF);
   // LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF,
   // SPI_OFF, USART0_OFF, TWI_OFF);
 }
 
-void checkForInactivity(int distance) {
+void countInactivity(int distance) {
   if (distance == g_lastMeasurement) {
     ++g_inactivityCount;
   } else {
     g_inactivityCount = 0;
   }
-
   g_lastMeasurement = distance;
+}
 
-  if (g_inactivityCount == INACTIVITY_LIMIT) {
-    g_inactivityCount = 0;
+void sleepUponInactivity() {
+  if (g_inactivityCount >= INACTIVITY_LIMIT) {
+    // Do not reset counter, so that we go back to sleep quickly if measurement
+    // stays the same
     goToSleep();
   }
 }
-
 void loop() {
   int distance = getDistanceInCm();
   catchInvalidMeasurement(distance);
-  checkForInactivity(distance);
+  countInactivity(distance);
+  sleepUponInactivity();
   visualizeAsLightbar(distance);
   // visualizeAsStrobe(distance);
 #ifdef WIP

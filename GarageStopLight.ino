@@ -1,6 +1,7 @@
 #include <LowPower.h>
 #include <NewPing.h>
 
+#define WIP 1
 #define TRIGGER_PIN 11
 #define ECHO_PIN 12
 #define MIN_DISTANCE 10
@@ -66,11 +67,16 @@ void setupLedPins() {
   }
 }
 
+void setupSerial() {
+#ifdef WIP
+  Serial.begin(9600);
+#endif
+}
 void setup() {
+  setupSerial();
   setupLedPins();
   setLedStates(LOW);
   writeLedPins();
-  Serial.begin(9600);
   roll();
 }
 
@@ -110,6 +116,10 @@ void visualizeAsStrobe(const int cm) {
 }
 
 void goToSleep() {
+#ifdef WIP
+  Serial.println("Going to sleep.");
+  Serial.flush();
+#endif
   blink(15);
   setLedStates(LOW);
   writeLedPins();
@@ -128,8 +138,6 @@ void checkForInactivity(int distance) {
   g_lastMeasurement = distance;
 
   if (g_inactivityCount == INACTIVITY_LIMIT) {
-    Serial.println("Going to sleep.");
-    Serial.flush();
     g_inactivityCount = 0;
     goToSleep();
   }
@@ -139,7 +147,9 @@ void loop() {
   int distance = getDistanceInCm();
   catchInvalidMeasurement(distance);
   checkForInactivity(distance);
-  Serial.println(distance);
   visualizeAsLightbar(distance);
   // visualizeAsStrobe(distance);
+#ifdef WIP
+  Serial.println(distance);
+#endif
 }
